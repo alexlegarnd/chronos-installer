@@ -1,0 +1,38 @@
+{
+    "languages": {
+        "fr" : {
+            "language": "Français",
+            "loading": "Chargement...",
+            "current_version": "Version actuelle : %s",
+            "enable_to_connect_to_repo": "Connexion au dépot impossible : %s",
+            "downloading_of": "Téléchargement de %f Mo",
+            "downloading": "Téléchargement - %f/%f Mo",
+            "downloaded": "Téléchargé (%f Mo)",
+            "clearing_install_folder": "Nettoyage du dossier d'installation...",
+            "cant_determine_format": "Impossible de determiner le format de l'archive %s",
+            "format_not_supported": "Le format de l'archive n'est pas supporté par 7z.dll",
+            "extracting": "Extraction de l'archive",
+            "extracted": "Extraction terminé",
+            "installation_path": "Chemin d'installation",
+            "options": "Options",
+            "desktop_shortcut": "Raccourci sur le bureau",
+            "start_menu_shortcut": "Raccourci dans le menu Démarrer",
+            "version": "Version",
+            "install": "Installer",
+            "open": "Ouvrir",
+            "ready": "Prêt",
+            "choose_install_folder": "Choisir un dossier d'installation",
+            "checking_integrity": "Vérification de l'intégrité du fichier",
+            "sha_not_found": "Le fichier de hashage SHA-1 n'est pas présent sur le dépot",
+            "md5_not_found": "Le fichier de hashage MD5 n'est pas présent sur le dépot",
+            "hash_not_matching": "L'empreinte du fichier ne correspond pas",
+            "file_existing_in_cache": "Récupération de l'archive depuis le cache",
+            "cleaning_cache": "Nettoyage du cache",
+            "install_canceled": "Installation annulée",
+            "create_desktop_shortcut": "Creation du raccourci sur le bureau",
+            "create_start_menu_shortcut": "Creation du raccourci dans le menu Démarrer",
+            "installation_success": "Installation terminé !",
+            "shortcut_description": "Chronos vous permet de calculer votre temps de travail"
+        }
+    }
+}
