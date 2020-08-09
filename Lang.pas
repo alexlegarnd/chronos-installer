@@ -14,11 +14,14 @@ TLang = class
     selected_lang: string;
 
     function GetAvailableLanguages: TStringList;
+    procedure SetSelectedLanguage(const ALang: String);
   public
     constructor Create;
     destructor Destroy; override;
     function GetTranslation(const AKey: string): string;
+    function GetFullNameLanguage(const AKey: String): String;
     property AvailableLanguages: TStringList read GetAvailableLanguages;
+    property SelectedLanguage: String read selected_lang write SetSelectedLanguage;
 end;
 
 implementation
@@ -86,7 +89,27 @@ var
 begin
   try
   lang:= langs[selected_lang];
-  Result:= lang[AKey]; 
+  Result:= lang[AKey];
+  except
+    on E: EListError do
+    begin
+      Result:= Format('<Translation not found: %s>', [AKey]);
+    end;
+  end;
+end;
+
+procedure TLang.SetSelectedLanguage(const ALang: string);
+begin
+  selected_lang:= ALang;
+end;
+
+function TLang.GetFullNameLanguage(const AKey: String): String;
+var
+  lang: TDictionary<string, string>;
+begin
+  try
+  lang:= langs[AKey];
+  Result:= lang['language'];
   except
     on E: EListError do
     begin

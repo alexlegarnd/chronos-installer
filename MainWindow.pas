@@ -14,10 +14,13 @@ const ARCHIVE: String = 'chronos.7z';
 const ARCHIVE_MD5: String = 'chronos.md5';
 const ARCHIVE_SHA1: String = 'chronos.sha';
 const CACHE_FOLDER: String = 'cache';
+
+// JSON
+const INSTALLED_PATH: String = 'installed_path';
+const DESKTOP_SHORTCUT: String = 'desktop_shortcut';
+const START_MENU_SHORTCUT: String = 'start_menu_shortcut';
   
 type
-
-  
 
   TForm1 = class(TForm)
     Image1: TImage;
@@ -35,12 +38,14 @@ type
     FileOpenDialog1: TFileOpenDialog;
     StatusLabel: TLabel;
     LogMemo: TMemo;
+    uninstallButton: TButton;
     procedure FormShow(Sender: TObject);
     procedure EnableInstallButton(Sender: TObject);
     procedure InstallButtonClick(Sender: TObject);
     procedure OpenButtonClick(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
+    procedure uninstallButtonClick(Sender: TObject);
   private
     { Private declarations }
     FLang: TLang;
@@ -54,6 +59,7 @@ type
     procedure ChangeStatus(const AValue: String);
     procedure DelFilesFromDir(Directory, FileMask: String; DelSubDirs: Boolean);
     procedure CreateShortcut(const targetName: String);
+    procedure CreateInformationFile;
     function GetStringFromRepo(const AKey: String; out OValue: String): Boolean;
     function DownloadFileFromRepo(const AVersion: String; AStream: TStream): Boolean;
     function CreateFolderIfNotExist(const APath: String): Boolean;
@@ -72,10 +78,12 @@ var
 implementation
 
 uses
-  JclCompression, ShellAPI, IdHashMessageDigest, IdHashSHA, ActiveX, ComObj, ShlObj, IOUtils, JclSysInfo;
+  JclCompression, ShellAPI, IdHashMessageDigest, json, System.UITypes,
+  IdHashSHA, ActiveX, ComObj, ShlObj, IOUtils, JclSysInfo, LangDialog;
 
 {$R *.dfm}
 
+// Create cache folder and returning his path
 function TForm1.GetTempFile(const AVersion: String): string;
 begin
   if not DirectoryExists(Format('.\%s', [CACHE_FOLDER])) then
@@ -96,7 +104,7 @@ end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
-  FLang:= TLang.Create;
+  FLang:= TForm2.GetLanguage(Self);
   Label1.Caption:= FLang.GetTranslation('version');
   labelCurrentVersion.Caption:= Format(FLang.GetTranslation('current_version'), [FLang.GetTranslation('loading')]);
   Label2.Caption:= FLang.GetTranslation('options');
@@ -106,16 +114,33 @@ begin
   InstallButton.Caption:= FLang.GetTranslation('install');
   ChangeStatus(FLang.GetTranslation('ready'));
   FileOpenDialog1.Title:= FLang.GetTranslation('choose_install_folder');
+  uninstallButton.Caption:= FLang.GetTranslation('uninstall');
 end;
 
 procedure TForm1.FormShow(Sender: TObject);
+var
+  save: TJSONObject;
 begin
+  if FileExists('config.json') then
+  begin
+    save:= TJSONObject.ParseJSONValue(TFile.ReadAllText('config.json')) as TJSONObject;
+    PathEdit.Text:= save.GetValue<String>(INSTALLED_PATH);
+    desktopShortcut.Checked:= save.GetValue<Boolean>(DESKTOP_SHORTCUT);
+    startShortcut.Checked:= save.GetValue<Boolean>(START_MENU_SHORTCUT);
+  end;
+  if FileExists(Format('%s\%s', [PathEdit.Text, EXECUTABLE])) then
+  begin
+    uninstallButton.Visible:= True;
+    uninstallButton.Enabled:= True;
+    InstallButton.Caption:= FLang.GetTranslation('reinstall');
+  end;
   // Starting Thread for fetching all versions
   TThread.CreateAnonymousThread(ThreadGetListOfVersions).Start;
   // Starting thread for fetching current_version
   TThread.CreateAnonymousThread(ThreadGetCurrentVersion).Start;
 end;
 
+// Download current stable version and print it into label
 procedure TForm1.ThreadGetCurrentVersion;
 var
   result_version: string;
@@ -136,6 +161,7 @@ begin
   end);
 end;
 
+// Download list of versions and add it to dropdown
 procedure TForm1.ThreadGetListOfVersions;
 var
     result_versions: string;
@@ -221,16 +247,21 @@ begin
   if CreateFolderIfNotExist(PathEdit.Text) then
   begin
     temp_file_path:= GetTempFile(version);
+    //Save all input to file, maybe useful for uninstall
+    CreateInformationFile;
     TThread.CreateAnonymousThread(procedure
     begin
       try
+        // Check if archive is cached
         if FileExists(temp_file_path) then
         begin
           ChangeStatus(FLang.GetTranslation('file_existing_in_cache'));
+          // If yes, set downloaded flag to true
           downloaded:= True;
         end
         else
         begin
+          // Download the archive from the repository
           s := TFileStream.Create(temp_file_path, fmCreate);
           try
             downloaded:= DownloadFileFromRepo(version, s);
@@ -238,6 +269,8 @@ begin
             s.Free;
           end;
         end;
+
+        // Check if download succeed
         if downloaded then
         begin
           TThread.Synchronize(nil,
@@ -246,21 +279,26 @@ begin
             ProgressBar1.Style:= TProgressBarStyle.pbstMarquee;
           end);
           try
+            // Checking archive integrity
             if CheckHash(temp_file_path, version) then
             begin
+              // If software already installed, remove all files
               if FileExists(Format('%s\%s', [PathEdit.Text, EXECUTABLE])) then
               begin
                 ChangeStatus(FLang.GetTranslation('clearing_install_folder'));
                 DelFilesFromDir(PathEdit.Text, '*.*', True);
               end;
+              //Unarchive and create shortcut
               Unarchive(temp_file_path);
               CreateShortcut(Format('%s\%s', [PathEdit.Text, EXECUTABLE]));
               ChangeStatus(FLang.GetTranslation('installation_success'));
+              // Change 'install' button to 'open' button
               InstallButton.OnClick:= OpenButtonClick;
               InstallButton.Caption:= FLang.GetTranslation('open');
             end
             else
             begin
+              // If cache corrupted, remove archive from cache
               ChangeStatus(FLang.GetTranslation('cleaning_cache'));
               DeleteFile(temp_file_path);
               ChangeStatus(FLang.GetTranslation('install_canceled'));
@@ -390,13 +428,48 @@ begin
   end;
 end;
 
+procedure TForm1.uninstallButtonClick(Sender: TObject);
+var
+  buttonSelected: Integer;
+begin
+//DELETE ALL
+  buttonSelected := messagedlg(FLang.GetTranslation('uninstall_confirmation'),
+                                                    mtConfirmation, mbYesNo, 0);
+
+  // Show the button type selected
+  if buttonSelected = mrYes then
+  begin
+    LockControls(True);
+    try
+      ChangeStatus(FLang.GetTranslation('uninstallation'));
+      DelFilesFromDir(PathEdit.Text, '*.*', True);
+      RmDir(PathEdit.Text);
+      ChangeStatus(FLang.GetTranslation('uninstallation_succeed'));
+    finally
+      uninstallButton.Visible:= False;
+      LockControls(False);
+    end;
+  end;
+end;
+
 procedure TForm1.LockControls(const AValue: Boolean);
 begin
-  InstallButton.Enabled:= not AValue;
+  if (versionBox.ItemIndex <> -1) then
+  begin
+    InstallButton.Enabled:= not AValue;
+  end
+  else
+  begin
+    InstallButton.Enabled:= False;
+  end;
   Button1.Enabled:= not AValue;
   versionBox.Enabled:= not AValue;
   desktopShortcut.Enabled:= not AValue;
   startShortcut.Enabled:= not AValue;
+  if uninstallButton.Visible then
+  begin
+    uninstallButton.Enabled:= not AValue;
+  end;
 end;
 
 procedure TForm1.Button1Click(Sender: TObject);
@@ -511,6 +584,7 @@ begin
     ChangeStatus(FLang.GetTranslation('md5_not_found'));
   end;
 
+  // Both hash are not needed
   Result:= (md5Match OR shaMatch);
   if not Result then
   begin
@@ -532,6 +606,7 @@ begin
   end;
 end;
 
+// Creating link with Windows API shitty function
 function TForm1.CreateShellLink(const TargetName, APath: string): Boolean;
 var
   IObject: IUnknown;
@@ -575,6 +650,28 @@ begin
     end
   finally
     CoUninitialize;
+  end;
+end;
+
+procedure TForm1.CreateInformationFile;
+var
+  save: TJSONObject;
+  myFile : TextFile;
+begin
+  save:= TJSONObject.Create;
+  try
+    save.AddPair(INSTALLED_PATH, PathEdit.Text);
+    save.AddPair(DESKTOP_SHORTCUT, TJSONBool.Create(desktopShortcut.Checked));
+    save.AddPair(START_MENU_SHORTCUT, TJSONBool.Create(startShortcut.Checked));
+    AssignFile(myFile, 'config.json');
+    try
+      ReWrite(myFile);
+      WriteLn(myFile, save.ToJSON);
+    finally
+      CloseFile(myFile);
+    end;
+  finally
+    save.Free;
   end;
 end;
 

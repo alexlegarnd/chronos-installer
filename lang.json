@@ -19,6 +19,8 @@
             "start_menu_shortcut": "Raccourci dans le menu Démarrer",
             "version": "Version",
             "install": "Installer",
+            "reinstall": "Réinstaller",
+            "uninstall": "Désinstaller",
             "open": "Ouvrir",
             "ready": "Prêt",
             "choose_install_folder": "Choisir un dossier d'installation",
@@ -32,7 +34,10 @@
             "create_desktop_shortcut": "Creation du raccourci sur le bureau",
             "create_start_menu_shortcut": "Creation du raccourci dans le menu Démarrer",
             "installation_success": "Installation terminé !",
-            "shortcut_description": "Chronos vous permet de calculer votre temps de travail"
+            "shortcut_description": "Chronos vous permet de calculer votre temps de travail",
+            "uninstall_confirmation": "Êtes-vous sur de vouloir désinstaller Chronos ?",
+            "uninstallation": "Suppression des fichiers",
+            "uninstallation_succeed": "Désinstallation terminé"
         }
     }
 }
