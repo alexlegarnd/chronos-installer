@@ -46,6 +46,7 @@ type
     procedure Button1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure uninstallButtonClick(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
   private
     { Private declarations }
     FLang: TLang;
@@ -115,6 +116,11 @@ begin
   ChangeStatus(FLang.GetTranslation('ready'));
   FileOpenDialog1.Title:= FLang.GetTranslation('choose_install_folder');
   uninstallButton.Caption:= FLang.GetTranslation('uninstall');
+end;
+
+procedure TForm1.FormDestroy(Sender: TObject);
+begin
+  FLang.Free;
 end;
 
 procedure TForm1.FormShow(Sender: TObject);
