@@ -8,11 +8,12 @@ uses
   Vcl.StdCtrls, Vcl.ComCtrls, IdBaseComponent, IdComponent, IdTCPConnection,
   IdTCPClient, IdHTTP, System.Classes, IdSSLOpenSSL, Lang;
 
-const REPO_URL: String = 'https://alexisdelhaie.ovh/dlcenter/chronos-repo/';
+const REPO_URL: String = 'https://alexisdelhaie.ovh/chronos-repo/';
+const VERSIONS_URL: String = 'list/%s/versions';
+const CHANNELS_URL: String = 'list/channels';
+const CURRENT_URL: String = 'current/%s';
 const EXECUTABLE: String = 'Chronos.exe';
 const ARCHIVE: String = 'chronos.7z';
-const ARCHIVE_MD5: String = 'chronos.md5';
-const ARCHIVE_SHA1: String = 'chronos.sha';
 const CACHE_FOLDER: String = 'cache';
 
 // JSON
@@ -39,6 +40,8 @@ type
     StatusLabel: TLabel;
     LogMemo: TMemo;
     uninstallButton: TButton;
+    channelBox: TComboBox;
+    Label4: TLabel;
     procedure FormShow(Sender: TObject);
     procedure EnableInstallButton(Sender: TObject);
     procedure InstallButtonClick(Sender: TObject);
@@ -52,6 +55,7 @@ type
     FLang: TLang;
     procedure ThreadGetCurrentVersion;
     procedure ThreadGetListOfVersions;
+    procedure ThreadGetListOfChannels;
     procedure LockControls(const AValue: Boolean);
     procedure OnHTTPWorkBegin(Sender: TObject; AWorkMode: TWorkMode; AWorkCountMax: Int64);
     procedure OnHTTPWorking(Sender: TObject; AWorkMode: TWorkMode; AWorkCount: Int64);
@@ -62,12 +66,12 @@ type
     procedure CreateShortcut(const targetName: String);
     procedure CreateInformationFile;
     function GetStringFromRepo(const AKey: String; out OValue: String): Boolean;
-    function DownloadFileFromRepo(const AVersion: String; AStream: TStream): Boolean;
+    function DownloadFileFromRepo(const AChannel, AVersion: String; AStream: TStream): Boolean;
     function CreateFolderIfNotExist(const APath: String): Boolean;
     function GetTempFile(const AVersion: String): String;
     function MD5(const fileName: String): String;
     function SHA1(const fileName: String): String;
-    function CheckHash(const fileName, AVersion: String): Boolean;
+    function CheckHash(const fileName, AVersion, AChannel: String): Boolean;
     function CreateShellLink(const TargetName, APath: string): Boolean;
   public
     { Public declarations }
@@ -100,14 +104,22 @@ end;
 
 procedure TForm1.EnableInstallButton(Sender: TObject);
 begin
+  if (channelBox.ItemIndex <> -1) and (Sender <> versionBox) then
+  begin
+    // Starting Thread for fetching all versions for current channel
+    TThread.CreateAnonymousThread(ThreadGetListOfVersions).Start;
+    // Starting thread for fetching current version
+    TThread.CreateAnonymousThread(ThreadGetCurrentVersion).Start;
+  end;
   InstallButton.Enabled:= (versionBox.ItemIndex <> -1);
 end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   FLang:= TForm2.GetLanguage(Self);
-  Label1.Caption:= FLang.GetTranslation('version');
-  labelCurrentVersion.Caption:= Format(FLang.GetTranslation('current_version'), [FLang.GetTranslation('loading')]);
+  Label1.Caption:= FLang.GetTranslation('channel');
+  Label4.Caption:= FLang.GetTranslation('version');
+  labelCurrentVersion.Caption:= Format(FLang.GetTranslation('current_version'), [FLang.GetTranslation('select_channel')]);
   Label2.Caption:= FLang.GetTranslation('options');
   Label3.Caption:= FLang.GetTranslation('installation_path');
   desktopShortcut.Caption:= FLang.GetTranslation('desktop_shortcut');
@@ -140,10 +152,8 @@ begin
     uninstallButton.Enabled:= True;
     InstallButton.Caption:= FLang.GetTranslation('reinstall');
   end;
-  // Starting Thread for fetching all versions
-  TThread.CreateAnonymousThread(ThreadGetListOfVersions).Start;
-  // Starting thread for fetching current_version
-  TThread.CreateAnonymousThread(ThreadGetCurrentVersion).Start;
+  // Starting Thread for fetching all channels
+  TThread.CreateAnonymousThread(ThreadGetListOfChannels).Start;
 end;
 
 // Download current stable version and print it into label
@@ -151,53 +161,99 @@ procedure TForm1.ThreadGetCurrentVersion;
 var
   result_version: string;
   http_success: Boolean;
+  doc: TJSONObject;
 begin
-  http_success:= GetStringFromRepo('current_version', result_version);
-  TThread.Synchronize(nil,
-  procedure
+  if channelBox.ItemIndex <> -1 then
   begin
-    if http_success then
-    begin
-      labelCurrentVersion.Caption:= Format(FLang.GetTranslation('current_version'), [result_version]);
-    end
-    else
-    begin
-      labelCurrentVersion.Visible:= False;
+    http_success:= GetStringFromRepo(Format(CURRENT_URL, [channelBox.Text]), result_version);
+    doc := TJSONObject.ParseJSONValue(result_version) as TJSONObject;
+    try
+      TThread.Synchronize(nil,
+      procedure
+      begin
+        if http_success then
+        begin
+          labelCurrentVersion.Caption:= Format(FLang.GetTranslation('current_version'), [doc.GetValue<string>('message')]);
+        end
+        else
+        begin
+          labelCurrentVersion.Visible:= False;
+        end;
+      end);
+    finally
+      doc.Free;
     end;
-  end);
+  end;
 end;
 
 // Download list of versions and add it to dropdown
 procedure TForm1.ThreadGetListOfVersions;
 var
     result_versions: string;
-    versions: TStringList;
     http_success: Boolean;
+    doc: TJSONObject;
+    versions: TJSONArray;
 begin
+  if channelBox.ItemIndex <> -1 then
+  begin
+    versionBox.Clear;
+    http_success:= GetStringFromRepo(Format(VERSIONS_URL, [channelBox.Text]), result_versions);
+    doc := TJSONObject.ParseJSONValue(result_versions) as TJSONObject;
+    try
+      versions:= doc.GetValue<TJSONArray>('channels');
+      TThread.Synchronize(nil,
+      procedure
+      var v: TJSONValue;
+      begin
+        if http_success then
+        begin
+           if versions.Count > 0 then
+          begin
+            for v in versions do
+            begin
+               Form1.versionBox.Items.Add(v.Value);
+            end;
+            Form1.versionBox.Enabled:= True;
+          end;
+        end;
+      end);
+    finally
+      doc.Free;
+    end;
+  end;
+end;
 
-  versions:= TStringList.Create;
+// Download list of versions and add it to dropdown
+procedure TForm1.ThreadGetListOfChannels;
+var
+    result_channels: string;
+    http_success: Boolean;
+    doc: TJSONObject;
+    channels: TJSONArray;
+begin
+  channelBox.Clear;
+  http_success:= GetStringFromRepo(CHANNELS_URL, result_channels);
+  doc := TJSONObject.ParseJSONValue(result_channels) as TJSONObject;
   try
-    http_success:= GetStringFromRepo('versions', result_versions);
-    versions.StrictDelimiter:= True;
-    versions.Text:= result_versions;
+    channels:= doc.GetValue<TJSONArray>('channels');
     TThread.Synchronize(nil,
     procedure
-    var v: string;
+    var c: TJSONValue;
     begin
       if http_success then
       begin
-        if versions.Count > 0 then
+        if channels.Count > 0 then
         begin
-          for v in versions do
+          for c in channels do
           begin
-             Form1.versionBox.Items.Add(v);
+             Form1.channelBox.Items.Add(c.Value);
           end;
-          Form1.versionBox.Enabled:= True;
+          Form1.channelBox.Enabled:= True;
         end;
       end;
     end);
   finally
-    versions.Free;
+    doc.Free;
   end;
 end;
 
@@ -244,12 +300,13 @@ end;
 
 procedure TForm1.InstallButtonClick(Sender: TObject);
   var
-    temp_file_path, version: String;
+    temp_file_path, version, channel: String;
     downloaded: Boolean;
     s: TStream;
 begin
   LockControls(True);
   version:= versionBox.Items[versionBox.ItemIndex];
+  channel:= channelBox.Items[channelBox.ItemIndex];
   if CreateFolderIfNotExist(PathEdit.Text) then
   begin
     temp_file_path:= GetTempFile(version);
@@ -270,7 +327,7 @@ begin
           // Download the archive from the repository
           s := TFileStream.Create(temp_file_path, fmCreate);
           try
-            downloaded:= DownloadFileFromRepo(version, s);
+            downloaded:= DownloadFileFromRepo(channel, version, s);
           finally
             s.Free;
           end;
@@ -286,7 +343,7 @@ begin
           end);
           try
             // Checking archive integrity
-            if CheckHash(temp_file_path, version) then
+            if CheckHash(temp_file_path, version, channel) then
             begin
               // If software already installed, remove all files
               if FileExists(Format('%s\%s', [PathEdit.Text, EXECUTABLE])) then
@@ -324,7 +381,7 @@ begin
   end;
 end;
 
-function TForm1.DownloadFileFromRepo(const AVersion: String; AStream: TStream): Boolean;
+function TForm1.DownloadFileFromRepo(const AChannel, AVersion: String; AStream: TStream): Boolean;
 var
   IdHTTP1: TIdHTTP;
   IdSSL: TIdSSLIOHandlerSocketOpenSSL;
@@ -342,7 +399,7 @@ begin
       IdSSL.SSLOptions.Method := sslvTLSv1;
       IdSSL.SSLOptions.Mode := sslmUnassigned;
       try
-        IdHTTP1.Get(Format('%s%s/%s', [REPO_URL, AVersion, ARCHIVE]), AStream);
+        IdHTTP1.Get(Format('%sget/%s/%s/%s', [REPO_URL, AChannel, AVersion, ARCHIVE]), AStream);
         Result:= True;
       except
         on E: Exception do begin
@@ -558,7 +615,7 @@ begin
   end;
 end;
 
-function TForm1.CheckHash(const fileName, AVersion: String): Boolean;
+function TForm1.CheckHash(const fileName, AVersion, AChannel: String): Boolean;
 var
   sha, md: String;
   shaSuccess, md5Success, md5Match, shaMatch: Boolean;
@@ -567,8 +624,8 @@ begin
   md5Match:= False;
   // shaMatch ou pas
   shaMatch:= False;
-  shaSuccess:= GetStringFromRepo(Format('%s/%s', [AVersion, ARCHIVE_SHA1]), sha);
-  md5Success:= GetStringFromRepo(Format('%s/%s', [AVersion, ARCHIVE_MD5]), md);
+  shaSuccess:= GetStringFromRepo(Format('sha/%s/%s/%s', [AChannel, AVersion, ARCHIVE]), sha);
+  md5Success:= GetStringFromRepo(Format('md5/%s/%s/%s', [AChannel, AVersion, ARCHIVE]), md);
 
   if shaSuccess then
   begin

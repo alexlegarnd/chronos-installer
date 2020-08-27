@@ -93,7 +93,7 @@ begin
   except
     on E: EListError do
     begin
-      Result:= Format('<Translation not found: %s>', [AKey]);
+      Result:= AKey;
     end;
   end;
 end;
@@ -113,7 +113,7 @@ begin
   except
     on E: EListError do
     begin
-      Result:= Format('<Translation not found: %s>', [AKey]);
+      Result:= AKey;
     end;
   end;
 end;

@@ -1722,11 +1722,11 @@ object Form1: TForm1
     Stretch = True
   end
   object Label1: TLabel
-    Left = 48
+    Left = 41
     Top = 157
-    Width = 35
+    Width = 27
     Height = 13
-    Caption = 'Version'
+    Caption = 'Canal'
   end
   object Label2: TLabel
     Left = 328
@@ -1743,7 +1743,7 @@ object Form1: TForm1
     Caption = 'Chemin d'#39'installation'
   end
   object labelCurrentVersion: TLabel
-    Left = 48
+    Left = 41
     Top = 203
     Width = 156
     Height = 13
@@ -1756,10 +1756,17 @@ object Form1: TForm1
     Height = 13
     Caption = 'Pr'#234't'
   end
+  object Label4: TLabel
+    Left = 136
+    Top = 157
+    Width = 35
+    Height = 13
+    Caption = 'Version'
+  end
   object versionBox: TComboBox
-    Left = 48
+    Left = 136
     Top = 176
-    Width = 177
+    Width = 89
     Height = 21
     AutoComplete = False
     AutoDropDown = True
@@ -1851,6 +1858,18 @@ object Form1: TForm1
     TabOrder = 8
     Visible = False
     OnClick = uninstallButtonClick
+  end
+  object channelBox: TComboBox
+    Left = 41
+    Top = 176
+    Width = 89
+    Height = 21
+    AutoComplete = False
+    AutoDropDown = True
+    Style = csDropDownList
+    Enabled = False
+    TabOrder = 9
+    OnChange = EnableInstallButton
   end
   object FileOpenDialog1: TFileOpenDialog
     FavoriteLinks = <>
