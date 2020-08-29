@@ -702,7 +702,8 @@ begin
     SHGetPathFromIDList(PIDL, InFolder) ;
 
     LinkName := IncludeTrailingPathDelimiter(APath);
-    LinkName := LinkName + ExtractFileName(TargetName) + '.lnk';
+    LinkName := LinkName + ExtractFileName(TargetName);
+    LinkName := ChangeFileExt(LinkName, '.lnk');
 
     if not FileExists(LinkName) then
     begin
