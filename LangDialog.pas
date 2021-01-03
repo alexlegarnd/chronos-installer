@@ -39,7 +39,14 @@ begin
   d:= TForm2.Create(AOwner);
   try
     d.ShowModal;
-    Result:= d.FLang;
+    if d.ModalResult = IDOK then
+    begin
+      Result:= d.FLang;
+    end
+    else
+    begin
+      Result:= nil;
+    end;
   finally
     d.Free;
   end;

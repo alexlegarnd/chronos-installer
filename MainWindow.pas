@@ -74,6 +74,8 @@ type
     function CheckHash(const fileName, AVersion, AChannel: String): Boolean;
     function CreateShellLink(const TargetName, APath: string): Boolean;
   public
+    procedure SetLang(ALang: TLang);
+
     { Public declarations }
   end;
 
@@ -87,6 +89,11 @@ uses
   IdHashSHA, ActiveX, ComObj, ShlObj, IOUtils, JclSysInfo, LangDialog;
 
 {$R *.dfm}
+
+procedure TForm1.SetLang(ALang: TLang);
+begin
+  FLang:= ALang;
+end;
 
 // Create cache folder and returning his path
 function TForm1.GetTempFile(const AVersion: String): string;
@@ -116,18 +123,20 @@ end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
-  FLang:= TForm2.GetLanguage(Self);
-  Label1.Caption:= FLang.GetTranslation('channel');
-  Label4.Caption:= FLang.GetTranslation('version');
-  labelCurrentVersion.Caption:= Format(FLang.GetTranslation('current_version'), [FLang.GetTranslation('select_channel')]);
-  Label2.Caption:= FLang.GetTranslation('options');
-  Label3.Caption:= FLang.GetTranslation('installation_path');
-  desktopShortcut.Caption:= FLang.GetTranslation('desktop_shortcut');
-  startShortcut.Caption:= FLang.GetTranslation('start_menu_shortcut');
-  InstallButton.Caption:= FLang.GetTranslation('install');
-  ChangeStatus(FLang.GetTranslation('ready'));
-  FileOpenDialog1.Title:= FLang.GetTranslation('choose_install_folder');
-  uninstallButton.Caption:= FLang.GetTranslation('uninstall');
+  if FLang <> nil then
+  begin
+    Label1.Caption:= FLang.GetTranslation('channel');
+    Label4.Caption:= FLang.GetTranslation('version');
+    labelCurrentVersion.Caption:= Format(FLang.GetTranslation('current_version'), [FLang.GetTranslation('select_channel')]);
+    Label2.Caption:= FLang.GetTranslation('options');
+    Label3.Caption:= FLang.GetTranslation('installation_path');
+    desktopShortcut.Caption:= FLang.GetTranslation('desktop_shortcut');
+    startShortcut.Caption:= FLang.GetTranslation('start_menu_shortcut');
+    InstallButton.Caption:= FLang.GetTranslation('install');
+    ChangeStatus(FLang.GetTranslation('ready'));
+    FileOpenDialog1.Title:= FLang.GetTranslation('choose_install_folder');
+    uninstallButton.Caption:= FLang.GetTranslation('uninstall');
+  end;
 end;
 
 procedure TForm1.FormDestroy(Sender: TObject);
@@ -269,8 +278,8 @@ begin
     IdSSL := TIdSSLIOHandlerSocketOpenSSL.Create(nil);
     try
       IdHTTP1.IOHandler := IdSSL;
-      IdSSL.SSLOptions.Method := sslvTLSv1;
-      IdSSL.SSLOptions.Method := sslvTLSv1;
+      IdSSL.SSLOptions.Method := sslvTLSv1_2;
+      IdSSL.SSLOptions.SSLVersions:= [sslvTLSv1_2];
       IdSSL.SSLOptions.Mode := sslmUnassigned;
       try
         OValue:= IdHTTP1.Get(Format('%s%s', [REPO_URL, AKey]));
@@ -295,7 +304,7 @@ var
 begin
   WS := Format('%s\%s', [PathEdit.Text, EXECUTABLE]);
   PWC := PWideChar(WS);
-  ShellExecute(Handle, 'open', PWC, nil, nil, SW_SHOWNORMAL);
+  ShellExecute(Handle, 'open', PWC, nil, PWideChar(PathEdit.Text), SW_SHOWNORMAL);
 end;
 
 procedure TForm1.InstallButtonClick(Sender: TObject);
@@ -395,8 +404,8 @@ begin
       IdHTTP1.OnWorkBegin:= OnHTTPWorkBegin;
       IdHTTP1.OnWork:= OnHTTPWorking;
       IdHTTP1.OnWorkEnd:= OnHTTPWorkEnd;
-      IdSSL.SSLOptions.Method := sslvTLSv1;
-      IdSSL.SSLOptions.Method := sslvTLSv1;
+      IdSSL.SSLOptions.Method := sslvTLSv1_2;
+      IdSSL.SSLOptions.SSLVersions:= [sslvTLSv1_2];
       IdSSL.SSLOptions.Mode := sslmUnassigned;
       try
         IdHTTP1.Get(Format('%sget/%s/%s/%s', [REPO_URL, AChannel, AVersion, ARCHIVE]), AStream);
